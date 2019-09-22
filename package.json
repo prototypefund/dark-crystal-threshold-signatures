@@ -1,0 +1,11 @@
+{
+  "name": "threshold-signatures",
+  "version": "1.0.0",
+  "description": "threshold signatures using dfinity/dkg and js-bls-lib",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}

@@ -4,10 +4,10 @@
   "description": "threshold signatures using dfinity/dkg and js-bls-lib",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tape test/**/*.test.js | tap-spec"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Magma Collective",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "bls-lib": "^0.3.4",
     "dkg": "0.0.1"

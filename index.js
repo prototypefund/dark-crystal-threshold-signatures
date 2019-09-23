@@ -1,6 +1,7 @@
 const bls = require('bls-lib')
 const dkg = require('dkg')
 const assert = require('assert')
+const crypto = require('crypto')
 
 module.exports = function (threshold, numMembers) { return new Member(threshold, numMembers) }
 
@@ -12,6 +13,7 @@ class Member {
     this.vvecs = []
     this.members = {}
     this.signatures = {}
+    this.messagesByHash = {}
     this.threshold = threshold
     this.numMembers = numMembers
     this.idToSk = {}
@@ -20,6 +22,7 @@ class Member {
   initId (seed) {
     // TODO assert seed...
     assert(!this.sk, 'id already generated')
+    this.id = seed
     this.sk = bls.secretKey()
     bls.hashToSecretKey(this.sk, Buffer.from([seed]))
     this.members[this.sk] = {}
@@ -35,11 +38,13 @@ class Member {
   }
 
   generateContribution () {
+    assert(Object.keys(this.members).length === this.numMembers, `not enough member ids, ${this.numMembers} needed`)
     const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members), this.threshold)
     this.vvec = verificationVector // publish this publicly
-    secretKeyContribution.forEach((sk, i) => {
-      this.members[Object.keys(this.members)[i]] = sk // encrypt and send these to each member
+    secretKeyContribution.forEach((contrib, i) => {
+      this.members[Object.keys(this.members)[i]].contrib = contrib // encrypt and send these to each member
     })
+    return this.vvec
   }
 
   storeVerificationVector (memberId, vvec) {
@@ -70,13 +75,15 @@ class Member {
   sign (message) {
     // TODO: assert message...
     assert(this.groupSecretKeyShare, 'Group secret key share not yet complete')
-    const signature = bls.signature()
-    bls.sign(signature, this.groupSecretKeyShare, message)
-    const hashOfMessage = hash(message)
+    const signaturePointer = bls.signature()
+    bls.sign(signaturePointer, this.groupSecretKeyShare, message)
+    const hashOfMessage = sha256(message)
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
+    const signature = Buffer.from(bls.signatureExport(signaturePointer))
     const signatureObject = { signature, id: this.sk }
     this.signatures[hashOfMessage].push(signatureObject)
-    return signature
+    this.messagesByHash[hashOfMessage] = message
+    return { signature, hashOfMessage }
   }
 
   recieveSignature (signature, id, hashOfMessage) {
@@ -86,11 +93,12 @@ class Member {
     this.signatures[hashOfMessage].push(signatureObject)
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
       const groupSig = bls.signature()
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => s.signature)
+      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(s.signature.buffer))
       const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)
       bls.signatureRecover(groupSig, signatures, signerIds)
-      // bls.verify(groupSig, this.groupPublicKey, message) ? :
-      this.groupSignatures[hashOfMessage] = groupSig
+      this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
+        ? groupSig
+        : false
     }
   }
 
@@ -123,4 +131,10 @@ class Member {
   //   bls.free(m.id)
   // })
   }
+}
+
+function sha256(message) {
+  const hash = crypto.createHash('sha256')
+  hash.update(message)
+  return hash.digest('hex')
 }

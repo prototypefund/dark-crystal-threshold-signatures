@@ -1,23 +1,23 @@
 const { describe } = require('tape-plus')
-const Member = require('..')
+const ThresholdSig = require('..')
 
 describe('basic', (context) => {
   context('', (assert, next) => {
     var members = {}
-    var vvecs = {}
+    var contributions = {}
     const memberIds = [10314, 30911, 25411, 8608, 31524]
 
-    Member.blsInit(() => {
+    ThresholdSig.blsInit(() => {
       memberIds.forEach((myId) => {
-        var member = Member(3, 5) // 3 of 5
-
+        var member = ThresholdSig(3, 5) // 3 of 5
         member.initId(myId)
+
         memberIds.forEach((id) => {
           if (id !== myId) {
             member.addMember(id)
           }
         })
-        vvecs[myId] = member.generateContribution()
+        contributions[myId] = member.generateContribution()
         members[myId] = member
       })
 
@@ -25,8 +25,8 @@ describe('basic', (context) => {
       memberIds.forEach((myId) => {
         memberIds.forEach((id) => {
           if (id !== myId) {
-            members[myId].storeVerificationVector(vvecs[id])
-            members[myId].recieveContribution(id, members[id].members[myId].contrib)
+            members[myId].storeVerificationVector(id, contributions[id].vvecs)
+            members[myId].recieveContribution(id, contributions[id].contrib[myId])
           }
         })
       })

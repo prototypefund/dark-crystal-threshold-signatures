@@ -43,7 +43,7 @@ class Member {
     // TODO: assert seed...
     const sk = bls.secretKey()
     bls.hashToSecretKey(sk, Buffer.from([seed]))
-    this.members[sk] = {}
+    this.members[sk] = { id: seed }
     this.idToSk[seed] = sk
   }
 
@@ -51,10 +51,16 @@ class Member {
     assert(Object.keys(this.members).length === this.numMembers, `not enough member ids, ${this.numMembers} needed`)
     const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members), this.threshold)
     this.vvec = verificationVector // publish this publicly
+    this.contribBuffers = {}
     secretKeyContribution.forEach((contrib, i) => {
-      this.members[Object.keys(this.members)[i]].contrib = contrib // encrypt and send these to each member
+      console.log(bls.secretKeyExport(contrib))
+      const contribBuffer = Buffer.from(bls.secretKeyExport(contrib))
+      this.contribBuffers[this.members[Object.keys(this.members)[i]].id] = contribBuffer // encrypt and send these to each member
     })
-    return this.vvec
+    return {
+      vvec: this.vvec,
+      contrib: this.contribBuffers
+    }
   }
 
   storeVerificationVector (memberId, vvec) {
@@ -71,8 +77,10 @@ class Member {
     }
   }
 
-  recieveContribution (memberId, keyContribution) {
+  recieveContribution (memberId, keyContributionBuffer) {
     const sk = this.idToSk[memberId]
+    console.log(bufferToUnit8(keyContributionBuffer))
+    const keyContribution = bls.secretKeyImport(bufferToUnit8(keyContributionBuffer))
     const verified = dkg.verifyContributionShare(bls, sk, keyContribution, this.members[sk].vvec)
     if (!verified) return false
     this.recievedShares.push(keyContribution)
@@ -104,7 +112,7 @@ class Member {
     this.signatures[hashOfMessage].push(signatureObject)
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
       const groupSig = bls.signature()
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(s.signature.buffer))
+      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToUnit8(s.signature)))
       const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)
       bls.signatureRecover(groupSig, signatures, signerIds)
       this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
@@ -140,4 +148,8 @@ function sha256(message) {
   const hash = crypto.createHash('sha256')
   hash.update(message)
   return hash.digest('hex')
+}
+
+function bufferToUnit8 (buf) {
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
 }

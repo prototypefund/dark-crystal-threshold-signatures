@@ -3,7 +3,17 @@ const dkg = require('dkg')
 const assert = require('assert')
 const crypto = require('crypto')
 
+var blsInitialised = false
+
 module.exports = function (threshold, numMembers) { return new Member(threshold, numMembers) }
+module.exports.blsInit = function (callback) {
+  if (blsInitialised) return callback()
+  bls.onModuleInit(() => {
+    bls.init()
+    blsInitialised = true
+    callback()
+  })
+}
 
 class Member {
   constructor (threshold, numMembers) {
@@ -49,6 +59,7 @@ class Member {
 
   storeVerificationVector (memberId, vvec) {
     const sk = this.idToSk[memberId]
+    console.log(this.idToSk, memberId)
     this.members[sk].vvec = vvec
     var vvecs = []
     Object.keys(this.members).forEach((someMember) => {
@@ -102,14 +113,6 @@ class Member {
     }
   }
 
-  ready (callback) {
-    if (this.isReady === true) return callback()
-    bls.onModuleInit(() => {
-      bls.init()
-      this.isReady = true
-      callback()
-    })
-  }
 
   saveState () {
     //this.signatures

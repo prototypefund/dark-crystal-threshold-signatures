@@ -54,7 +54,7 @@ class Member {
     this.contribBuffers = {}
     secretKeyContribution.forEach((contrib, i) => {
       console.log(bls.secretKeyExport(contrib))
-      const contribBuffer = Buffer.from(bls.secretKeyExport(contrib))
+      const contribBuffer = int8ToBuffer(bls.secretKeyExport(contrib))
       this.contribBuffers[this.members[Object.keys(this.members)[i]].id] = contribBuffer // encrypt and send these to each member
     })
     return {
@@ -79,8 +79,7 @@ class Member {
 
   recieveContribution (memberId, keyContributionBuffer) {
     const sk = this.idToSk[memberId]
-    console.log(bufferToUnit8(keyContributionBuffer))
-    const keyContribution = bls.secretKeyImport(bufferToUnit8(keyContributionBuffer))
+    const keyContribution = bls.secretKeyImport(bufferToInt8(keyContributionBuffer))
     const verified = dkg.verifyContributionShare(bls, sk, keyContribution, this.members[sk].vvec)
     if (!verified) return false
     this.recievedShares.push(keyContribution)
@@ -98,7 +97,7 @@ class Member {
     bls.sign(signaturePointer, this.groupSecretKeyShare, message)
     const hashOfMessage = sha256(message)
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
-    const signature = Buffer.from(bls.signatureExport(signaturePointer))
+    const signature = int8ToBuffer(bls.signatureExport(signaturePointer))
     const signatureObject = { signature, id: this.sk }
     this.signatures[hashOfMessage].push(signatureObject)
     this.messagesByHash[hashOfMessage] = message
@@ -112,7 +111,7 @@ class Member {
     this.signatures[hashOfMessage].push(signatureObject)
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
       const groupSig = bls.signature()
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToUnit8(s.signature)))
+      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature)))
       const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)
       bls.signatureRecover(groupSig, signatures, signerIds)
       this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
@@ -150,6 +149,13 @@ function sha256(message) {
   return hash.digest('hex')
 }
 
-function bufferToUnit8 (buf) {
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+function bufferToInt8 (buf) {
+  // TODO
+  // return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+  return buf
+}
+
+function int8ToBuffer (intArray) {
+  // TODO
+  return intArray
 }

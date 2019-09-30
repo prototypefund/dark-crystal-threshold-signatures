@@ -24,9 +24,11 @@ class Member {
     this.members = {}
     this.signatures = {}
     this.messagesByHash = {}
+    this.contribBuffers = {}
     this.threshold = threshold
     this.numMembers = numMembers
     this.idToSk = {}
+    this.groupSignatures = {}
   }
 
   initId (seed) {
@@ -45,6 +47,7 @@ class Member {
     bls.hashToSecretKey(sk, Buffer.from([seed]))
     this.members[sk] = { id: seed }
     this.idToSk[seed] = sk
+    console.log('filter', bls.secretKeyExport(sk).filter(a => a > 127 || a < -127))
   }
 
   generateContribution () {
@@ -52,11 +55,9 @@ class Member {
     const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members), this.threshold)
     this.vvec = verificationVector.map(v => bls.publicKeyExport(v)) // publish this publicly
     this.members[this.sk].vvec = this.vvec
-    this.contribBuffers = {}
     secretKeyContribution.forEach((contrib, i) => {
-      // console.log(bls.secretKeyExport(contrib))
       const contribBuffer = int8ToBuffer(bls.secretKeyExport(contrib))
-      this.contribBuffers[this.members[Object.keys(this.members)[i]].id] = contribBuffer // encrypt and send these to each member
+      this.contribBuffers[this.members[Object.keys(this.members)[i]].id] = contribBuffer
     })
     this.recievedShares.push(this.contribBuffers[this.id])
     return {
@@ -73,7 +74,6 @@ class Member {
       if (this.members[someMember].vvec) vvecs.push(this.members[someMember].vvec)
     })
     if (vvecs.length === Object.keys(this.members).length) {
-      console.log('got enough vvecs')
       const vvecsPointers = vvecs.map(vvec => vvec.map(v => bls.publicKeyImport(v)))
       this.groupVvec = dkg.addVerificationVectors(bls, vvecsPointers)
       this.groupPublicKey = this.groupVvec[0]
@@ -83,11 +83,10 @@ class Member {
   recieveContribution (memberId, keyContributionBuffer) {
     const sk = this.idToSk[memberId]
     const keyContribution = bls.secretKeyImport(bufferToInt8(keyContributionBuffer))
-    // const verified = dkg.verifyContributionShare(bls, sk, keyContribution, this.members[sk].vvec)
-    // if (!verified) return false
+    const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.publicKeyImport(v)))
+    if (!verified) return false
     this.recievedShares.push(keyContribution)
 
-    console.log(this.recievedShares.length)
     if (this.recievedShares.length === this.threshold) { // this.members.length
       this.groupSecretKeyShare = dkg.addContributionShares(bls, this.recievedShares)
     }
@@ -110,20 +109,22 @@ class Member {
 
   recieveSignature (signature, id, hashOfMessage) {
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
+
     const signatureObject = { signature, id: this.idToSk[id] }
-    // TODO: check we dont already have it
-    this.signatures[hashOfMessage].push(signatureObject)
+    // check we dont already have it
+    if (this.signatures[hashOfMessage].indexOf(signatureObject) < 0) this.signatures[hashOfMessage].push(signatureObject)
+
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
       const groupSig = bls.signature()
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature)))
-      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)
+      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature))).slice(0, this.threshold)
+      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id).slice(0, this.threshold)
       bls.signatureRecover(groupSig, signatures, signerIds)
+      // console.log(bls.signatureExport(groupSig))
       this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
         ? groupSig
         : false
     }
   }
-
 
   saveState () {
     //this.signatures
@@ -147,7 +148,7 @@ class Member {
   }
 }
 
-function sha256(message) {
+function sha256 (message) {
   const hash = crypto.createHash('sha256')
   hash.update(message)
   return hash.digest('hex')

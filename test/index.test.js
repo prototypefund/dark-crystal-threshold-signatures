@@ -25,7 +25,7 @@ describe('basic', (context) => {
       memberIds.forEach((myId) => {
         memberIds.forEach((id) => {
           if (id !== myId) {
-            members[myId].storeVerificationVector(id, contributions[id].vvecs)
+            members[myId].storeVerificationVector(id, contributions[id].vvec)
             members[myId].recieveContribution(id, contributions[id].contrib[myId])
           }
         })

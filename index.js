@@ -50,13 +50,15 @@ class Member {
   generateContribution () {
     assert(Object.keys(this.members).length === this.numMembers, `not enough member ids, ${this.numMembers} needed`)
     const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members), this.threshold)
-    this.vvec = verificationVector // publish this publicly
+    this.vvec = verificationVector.map(v => bls.publicKeyExport(v)) // publish this publicly
+    this.members[this.sk].vvec = this.vvec
     this.contribBuffers = {}
     secretKeyContribution.forEach((contrib, i) => {
-      console.log(bls.secretKeyExport(contrib))
+      // console.log(bls.secretKeyExport(contrib))
       const contribBuffer = int8ToBuffer(bls.secretKeyExport(contrib))
       this.contribBuffers[this.members[Object.keys(this.members)[i]].id] = contribBuffer // encrypt and send these to each member
     })
+    this.recievedShares.push(this.contribBuffers[this.id])
     return {
       vvec: this.vvec,
       contrib: this.contribBuffers
@@ -65,14 +67,15 @@ class Member {
 
   storeVerificationVector (memberId, vvec) {
     const sk = this.idToSk[memberId]
-    console.log(this.idToSk, memberId)
     this.members[sk].vvec = vvec
     var vvecs = []
     Object.keys(this.members).forEach((someMember) => {
       if (this.members[someMember].vvec) vvecs.push(this.members[someMember].vvec)
     })
-    if (vvecs.length === this.members.length) {
-      this.groupVvec = dkg.addVerificationVectors(bls, vvecs)
+    if (vvecs.length === Object.keys(this.members).length) {
+      console.log('got enough vvecs')
+      const vvecsPointers = vvecs.map(vvec => vvec.map(v => bls.publicKeyImport(v)))
+      this.groupVvec = dkg.addVerificationVectors(bls, vvecsPointers)
       this.groupPublicKey = this.groupVvec[0]
     }
   }
@@ -80,10 +83,11 @@ class Member {
   recieveContribution (memberId, keyContributionBuffer) {
     const sk = this.idToSk[memberId]
     const keyContribution = bls.secretKeyImport(bufferToInt8(keyContributionBuffer))
-    const verified = dkg.verifyContributionShare(bls, sk, keyContribution, this.members[sk].vvec)
-    if (!verified) return false
+    // const verified = dkg.verifyContributionShare(bls, sk, keyContribution, this.members[sk].vvec)
+    // if (!verified) return false
     this.recievedShares.push(keyContribution)
 
+    console.log(this.recievedShares.length)
     if (this.recievedShares.length === this.threshold) { // this.members.length
       this.groupSecretKeyShare = dkg.addContributionShares(bls, this.recievedShares)
     }
@@ -106,7 +110,7 @@ class Member {
 
   recieveSignature (signature, id, hashOfMessage) {
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
-    const signatureObject = { signature, id: this.idToSk(id) }
+    const signatureObject = { signature, id: this.idToSk[id] }
     // TODO: check we dont already have it
     this.signatures[hashOfMessage].push(signatureObject)
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {

@@ -87,7 +87,7 @@ class Member {
     if (!verified) return false
     this.recievedShares.push(keyContribution)
 
-    if (this.recievedShares.length === this.threshold) { // this.members.length
+    if ((this.recievedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
       this.groupSecretKeyShare = dkg.addContributionShares(bls, this.recievedShares)
     }
     return true
@@ -96,6 +96,7 @@ class Member {
   sign (message) {
     // TODO: assert message...
     assert(this.groupSecretKeyShare, 'Group secret key share not yet complete')
+    console.log('groupsks',Buffer.from(bls.secretKeyExport(this.groupSecretKeyShare)).toString('hex'))
     const signaturePointer = bls.signature()
     bls.sign(signaturePointer, this.groupSecretKeyShare, message)
     const hashOfMessage = sha256(message)
@@ -109,17 +110,21 @@ class Member {
 
   recieveSignature (signature, id, hashOfMessage) {
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
-
     const signatureObject = { signature, id: this.idToSk[id] }
     // check we dont already have it
     if (this.signatures[hashOfMessage].indexOf(signatureObject) < 0) this.signatures[hashOfMessage].push(signatureObject)
 
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
       const groupSig = bls.signature()
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature))).slice(0, this.threshold)
-      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id).slice(0, this.threshold)
+      // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
+      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature)))//.slice(0, this.threshold)
+      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)//.slice(0, this.threshold)
+console.log('i am here')
       bls.signatureRecover(groupSig, signatures, signerIds)
-      // console.log(bls.signatureExport(groupSig))
+      console.log('groupsig',Buffer.from(bls.signatureExport(groupSig)).toString('hex'))
+
+      console.log('verify', groupSig, Buffer.from(bls.publicKeyExport(this.groupPublicKey)).toString('hex'), this.messagesByHash[hashOfMessage])
+      console.log(bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage]))
       this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
         ? groupSig
         : false

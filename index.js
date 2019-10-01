@@ -47,7 +47,6 @@ class Member {
     bls.hashToSecretKey(sk, Buffer.from([seed]))
     this.members[sk] = { id: seed }
     this.idToSk[seed] = sk
-    console.log('filter', bls.secretKeyExport(sk).filter(a => a > 127 || a < -127))
   }
 
   generateContribution () {
@@ -96,7 +95,6 @@ class Member {
   sign (message) {
     // TODO: assert message...
     assert(this.groupSecretKeyShare, 'Group secret key share not yet complete')
-    console.log('groupsks',Buffer.from(bls.secretKeyExport(this.groupSecretKeyShare)).toString('hex'))
     const signaturePointer = bls.signature()
     bls.sign(signaturePointer, this.groupSecretKeyShare, message)
     const hashOfMessage = sha256(message)
@@ -119,7 +117,6 @@ class Member {
       // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
       const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature)))//.slice(0, this.threshold)
       const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)//.slice(0, this.threshold)
-console.log('i am here')
       bls.signatureRecover(groupSig, signatures, signerIds)
       console.log('groupsig',Buffer.from(bls.signatureExport(groupSig)).toString('hex'))
 

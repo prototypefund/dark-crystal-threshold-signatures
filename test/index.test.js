@@ -34,18 +34,19 @@ describe('basic', (context) => {
       // sign a message
       const message = 'its nice to be important but its more important to be nice'
       const signatures = {}
-      memberIds.slice(0,3).forEach((myId) => {
+      // 3 members sign
+      memberIds.slice(0, 3).forEach((myId) => {
         signatures[myId] = members[myId].sign(message)
       })
-      memberIds.slice(0,3).forEach((myId) => {
-        memberIds.slice(0,3).forEach((id) => {
+      memberIds.slice(0, 3).forEach((myId) => {
+        memberIds.slice(0, 3).forEach((id) => {
           if (id !== myId) {
             members[myId].recieveSignature(signatures[id].signature, id, signatures[id].hashOfMessage)
           }
         })
       })
       const hashOfMessage = signatures[memberIds[0]].hashOfMessage
-      // assert.ok(members[memberIds[1]].groupSignatures[hashOfMessage], 'group signature built')
+      assert.ok(members[memberIds[1]].groupSignatures[hashOfMessage], 'group signature built')
       next()
     })
   })

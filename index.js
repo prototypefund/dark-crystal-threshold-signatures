@@ -37,7 +37,7 @@ class Member {
     this.id = seed
     this.sk = bls.secretKey()
     bls.hashToSecretKey(this.sk, Buffer.from([seed]))
-    this.members[this.sk] = {}
+    this.members[this.sk] = { id: seed }
     this.idToSk[seed] = this.sk
   }
 
@@ -45,7 +45,8 @@ class Member {
     // TODO: assert seed...
     const sk = bls.secretKey()
     bls.hashToSecretKey(sk, Buffer.from([seed]))
-    this.members[sk] = { id: seed }
+    this.members[sk] = this.members[sk] || {}
+    this.members[sk].id = seed
     this.idToSk[seed] = sk
   }
 
@@ -54,8 +55,10 @@ class Member {
     const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members), this.threshold)
     this.vvec = verificationVector.map(v => bls.publicKeyExport(v)) // publish this publicly
     this.members[this.sk].vvec = this.vvec
+    console.log('----')
     secretKeyContribution.forEach((contrib, i) => {
       const contribBuffer = int8ToBuffer(bls.secretKeyExport(contrib))
+      console.log(this.members[Object.keys(this.members)[i]].id, i)
       this.contribBuffers[this.members[Object.keys(this.members)[i]].id] = contribBuffer
     })
     this.recievedShares.push(this.contribBuffers[this.id])
@@ -76,6 +79,7 @@ class Member {
       const vvecsPointers = vvecs.map(vvec => vvec.map(v => bls.publicKeyImport(v)))
       this.groupVvec = dkg.addVerificationVectors(bls, vvecsPointers)
       this.groupPublicKey = this.groupVvec[0]
+      this.groupPublicKeyExport = bls.publicKeyExport(this.groupPublicKey)
     }
   }
 
@@ -85,8 +89,8 @@ class Member {
     const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.publicKeyImport(v)))
     if (!verified) return false
     this.recievedShares.push(keyContribution)
-
-    if ((this.recievedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
+    // if ((this.recievedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
+    if ((this.recievedShares.length === Object.keys(this.members).length) && !this.groupSecretKeyShare) {
       this.groupSecretKeyShare = dkg.addContributionShares(bls, this.recievedShares)
     }
     return true
@@ -114,14 +118,22 @@ class Member {
 
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
       const groupSig = bls.signature()
-      // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature)))//.slice(0, this.threshold)
-      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)//.slice(0, this.threshold)
-      bls.signatureRecover(groupSig, signatures, signerIds)
-      console.log('groupsig',Buffer.from(bls.signatureExport(groupSig)).toString('hex'))
 
-      console.log('verify', groupSig, Buffer.from(bls.publicKeyExport(this.groupPublicKey)).toString('hex'), this.messagesByHash[hashOfMessage])
+      // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
+
+      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature)))//.slice(0, this.threshold)
+
+      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)//.slice(0, this.threshold)
+console.log(signatures)
+      console.log(signerIds)
+      bls.signatureRecover(groupSig, signatures, signerIds)
+
+      // console.log('groupsig',Buffer.from(bls.signatureExport(groupSig)).toString('hex'))
+
+      // console.log('verify', groupSig, Buffer.from(bls.publicKeyExport(this.groupPublicKey)).toString('hex'), this.messagesByHash[hashOfMessage])
+
       console.log(bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage]))
+
       this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
         ? groupSig
         : false

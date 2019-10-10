@@ -4,7 +4,7 @@ const ThresholdSig = require('..')
 const threshold = 3
 
 describe('basic', (context) => {
-  context('', (assert, next) => {
+  context('Group signatures', (assert, next) => {
     var members = {}
     var contributions = {}
     const memberIds = [10314, 30911, 25411, 8608, 31524]
@@ -24,18 +24,20 @@ describe('basic', (context) => {
         members[myId] = member
       })
       assert.true(Object.keys(contributions).length === memberIds.length, 'Correct number of contributions')
+
       // recieve contribution round
       memberIds.forEach((myId) => {
         assert.true(contributions[myId].vvec.length === threshold, 'verification vector has length = treshold')
         memberIds.forEach((id) => {
           if (id !== myId) {
-            assert.ok(contributions[id].contrib[myId], `Contribution from peer ${memberIds.indexOf(id)} to peer ${memberIds.indexOf(myId)} exists`)
+            // assert.ok(contributions[id].contrib[myId], `Contribution from peer ${memberIds.indexOf(id)} to peer ${memberIds.indexOf(myId)} exists`)
             members[myId].storeVerificationVector(id, contributions[id].vvec)
-            members[myId].recieveContribution(id, contributions[id].contrib[myId])
+            assert.true(members[myId].recieveContribution(id, contributions[id].contrib[myId]), 'contribution valid')
           }
         })
       })
 
+      // check that everything worked
       var groupKeys = []
       memberIds.forEach((id) => {
         if (members[id].groupPublicKeyExport) groupKeys.push(members[id].groupPublicKeyExport)
@@ -61,7 +63,7 @@ describe('basic', (context) => {
       })
 
       const hashOfMessage = signatures[memberIds[0]].hashOfMessage
-      assert.ok(members[memberIds[1]].groupSignatures[hashOfMessage], 'group signature built')
+      assert.ok(members[memberIds[1]].groupSignatures[hashOfMessage], 'Group signature valid')
       next()
     })
   })

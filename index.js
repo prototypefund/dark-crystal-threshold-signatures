@@ -27,7 +27,6 @@ class Member {
     this.contribBuffers = {}
     this.threshold = threshold
     this.numMembers = numMembers
-    this.idToSk = {}
     this.groupSignatures = {}
   }
 
@@ -37,39 +36,31 @@ class Member {
     this.id = seed
     this.sk = bls.secretKey()
     bls.hashToSecretKey(this.sk, Buffer.from([seed]))
-    this.members[this.sk] = { id: seed }
-    this.idToSk[seed] = this.sk
+    this.members[bls.secretKeyExport(this.sk)] = {}
   }
 
-  addMember (seed) {
-    // TODO: assert seed...
-    const sk = bls.secretKey()
-    bls.hashToSecretKey(sk, Buffer.from([seed]))
-    this.members[sk] = this.members[sk] || {}
-    this.members[sk].id = seed
-    this.idToSk[seed] = sk
+  addMember (secretKey) {
+    this.members[secretKey] = this.members[secretKey] || {}
   }
 
   generateContribution () {
     assert(Object.keys(this.members).length === this.numMembers, `not enough member ids, ${this.numMembers} needed`)
-    const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members), this.threshold)
+    const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members).map(k => bls.secretKeyImport(k)), this.threshold)
     this.vvec = verificationVector.map(v => bls.publicKeyExport(v)) // publish this publicly
-    this.members[this.sk].vvec = this.vvec
+    this.members[bls.secretKeyExport(this.sk)].vvec = this.vvec
     console.log('----')
     secretKeyContribution.forEach((contrib, i) => {
-      const contribBuffer = int8ToBuffer(bls.secretKeyExport(contrib))
-      console.log(this.members[Object.keys(this.members)[i]].id, i)
-      this.contribBuffers[this.members[Object.keys(this.members)[i]].id] = contribBuffer
+      const contribBuffer = bls.secretKeyExport(contrib)
+      this.contribBuffers[Object.keys(this.members)[i]] = contribBuffer
     })
-    this.recievedShares.push(this.contribBuffers[this.id])
+    this.recievedShares.push(this.contribBuffers[bls.secretKeyExport(this.sk)])
     return {
       vvec: this.vvec,
       contrib: this.contribBuffers
     }
   }
 
-  storeVerificationVector (memberId, vvec) {
-    const sk = this.idToSk[memberId]
+  storeVerificationVector (sk, vvec) {
     this.members[sk].vvec = vvec
     var vvecs = []
     Object.keys(this.members).forEach((someMember) => {
@@ -83,9 +74,8 @@ class Member {
     }
   }
 
-  recieveContribution (memberId, keyContributionBuffer) {
-    const sk = this.idToSk[memberId]
-    const keyContribution = bls.secretKeyImport(bufferToInt8(keyContributionBuffer))
+  recieveContribution (sk, keyContributionBuffer) {
+    const keyContribution = bls.secretKeyImport(keyContributionBuffer)
     const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.publicKeyImport(v)))
     if (!verified) return false
     this.recievedShares.push(keyContribution)
@@ -103,7 +93,7 @@ class Member {
     bls.sign(signaturePointer, this.groupSecretKeyShare, message)
     const hashOfMessage = sha256(message)
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
-    const signature = int8ToBuffer(bls.signatureExport(signaturePointer))
+    const signature = bls.signatureExport(signaturePointer)
     const signatureObject = { signature, id: this.sk }
     this.signatures[hashOfMessage].push(signatureObject)
     this.messagesByHash[hashOfMessage] = message
@@ -121,19 +111,19 @@ class Member {
 
       // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
 
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature)))//.slice(0, this.threshold)
+      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature))).slice(0, this.threshold)
 
-      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id)//.slice(0, this.threshold)
-console.log(signatures)
+      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id).slice(0, this.threshold)
+      console.log(signatures)
       console.log(signerIds)
       bls.signatureRecover(groupSig, signatures, signerIds)
 
-      // console.log('groupsig',Buffer.from(bls.signatureExport(groupSig)).toString('hex'))
+      console.log('groupsig',Buffer.from(bls.signatureExport(groupSig)).toString('hex'))
 
-      // console.log('verify', groupSig, Buffer.from(bls.publicKeyExport(this.groupPublicKey)).toString('hex'), this.messagesByHash[hashOfMessage])
+      console.log('verify', groupSig, Buffer.from(bls.publicKeyExport(this.groupPublicKey)).toString('hex'), this.messagesByHash[hashOfMessage])
 
       console.log(bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage]))
-
+// console.log(Object.values(this.idToSk).map(s => Buffer.from(bls.secretKeyExport(s)).toString('hex')))
       this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
         ? groupSig
         : false

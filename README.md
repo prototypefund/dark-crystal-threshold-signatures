@@ -4,4 +4,4 @@
 
 This is class providing group threshold signatures using distributed key generation.
 
-Uses [js-bls-lib](https://github.com/dfinity/js-bls-lib) and [dfinity/dkg](https://github.com/dfinity/dkg)
+Uses [bls-wasm](https://github.com/herumi/bls-wasm) and [a fork of dfinity/dkg](https://gitlab.com/dark-crystal/dkg) (not yet published)

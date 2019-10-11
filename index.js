@@ -22,7 +22,7 @@ class Member {
     this.vvecs = []
     this.members = {}
     this.signatures = {}
-    this.messagesByHash = {}
+    // this.messagesByHash = {}
     this.contribBuffers = {}
     this.threshold = threshold
     this.numMembers = numMembers
@@ -49,11 +49,12 @@ class Member {
     assert(Object.keys(this.members).length === this.numMembers, `not enough member ids, ${this.numMembers} needed`)
     const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members).map(k => bls.secretKeyImport(hexToInt8(k))), this.threshold)
     this.vvec = verificationVector.map(v => int8ToHex(bls.publicKeyExport(v))) // publish this publicly
+    verificationVector.forEach(v => bls.free(v))
     this.members[this.skHex].vvec = this.vvec
-    console.log('----')
     secretKeyContribution.forEach((contrib, i) => {
       const contribBuffer = int8ToHex(bls.secretKeyExport(contrib))
       this.contribBuffers[Object.keys(this.members)[i]] = contribBuffer
+      bls.free(contrib)
     })
     this.recievedShares.push(this.contribBuffers[this.skHex])
     return {
@@ -70,6 +71,7 @@ class Member {
     })
     if (vvecs.length === Object.keys(this.members).length) {
       const vvecsPointers = vvecs.map(vvec => vvec.map(v => bls.publicKeyImport(hexToInt8(v))))
+      console.log(vvecsPointers)
       this.groupVvec = dkg.addVerificationVectors(bls, vvecsPointers)
       this.groupPublicKey = this.groupVvec[0]
       this.groupPublicKeyExport = int8ToHex(bls.publicKeyExport(this.groupPublicKey))
@@ -96,30 +98,28 @@ class Member {
     const pk = bls.publicKey()
     bls.getPublicKey(pk, this.groupSecretKeyShare)
     console.log('sigtest:', bls.verify(signaturePointer, pk, message))
-    const hashOfMessage = sha256(message)
-    this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
+    this.signatures[message] = this.signatures[message] || []
     const signature = int8ToHex(bls.signatureExport(signaturePointer))
     const signatureObject = { signature, id: this.skHex }
-    this.signatures[hashOfMessage].push(signatureObject)
-    this.messagesByHash[hashOfMessage] = message
-    return { signature, hashOfMessage }
+    this.signatures[message].push(signatureObject)
+    return { signature, message }
   }
 
-  recieveSignature (signature, sk, hashOfMessage) {
-    this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
+  recieveSignature (signature, sk, message) {
+    this.signatures[message] = this.signatures[message] || []
     const signatureObject = { signature, id: sk }
     // check we dont already have it (need to compare objects)
     // if (this.signatures[hashOfMessage].indexOf(signatureObject) < 0)
-    this.signatures[hashOfMessage].push(signatureObject)
+    this.signatures[message].push(signatureObject)
 
-    if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
+    if ((this.signatures[message].length >= this.threshold) && (!this.groupSignatures[message])) {
       const groupSig = bls.signature()
 
       // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
 
       var signatures = []
       var signerIds = []
-      this.signatures[hashOfMessage].forEach((sigObject) => {
+      this.signatures[message].forEach((sigObject) => {
         signatures.push(bls.signatureImport(hexToInt8(sigObject.signature)))
         signerIds.push(bls.secretKeyImport(hexToInt8(sigObject.id)))
       })
@@ -130,11 +130,11 @@ class Member {
 
       console.log('groupsig',Buffer.from(bls.signatureExport(groupSig)).toString('hex'))
 
-      console.log('verify', groupSig, Buffer.from(bls.publicKeyExport(this.groupPublicKey)).toString('hex'), this.messagesByHash[hashOfMessage])
+      console.log('verify', groupSig, Buffer.from(bls.publicKeyExport(this.groupPublicKey)).toString('hex'), message)
 
-      console.log(bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage]))
+      console.log(bls.verify(groupSig, this.groupPublicKey, message))
 // console.log(Object.values(this.idToSk).map(s => Buffer.from(bls.secretKeyExport(s)).toString('hex')))
-      this.groupSignatures[hashOfMessage] = bls.verify(groupSig, this.groupPublicKey, this.messagesByHash[hashOfMessage])
+      this.groupSignatures[message] = bls.verify(groupSig, this.groupPublicKey, message)
         ? groupSig
         : false
     }

@@ -1,7 +1,7 @@
 {
   "name": "threshold-signatures",
   "version": "1.0.0",
-  "description": "threshold signatures using dfinity/dkg and js-bls-lib",
+  "description": "Threshold signatures using dfinity/dkg and bls-wasm",
   "main": "index.js",
   "scripts": {
     "test": "tape test/**/*.test.js | tap-spec"
@@ -9,12 +9,10 @@
   "author": "Magma Collective",
   "license": "AGPL-3.0-only",
   "dependencies": {
-    "bls-lib": "^0.3.4",
     "bls-wasm": "^0.2.7",
     "dkg": "0.0.1"
   },
   "devDependencies": {
-    "async": "^3.1.0",
     "tap-spec": "^5.0.0",
     "tape": "^4.11.0",
     "tape-plus": "^1.0.0"

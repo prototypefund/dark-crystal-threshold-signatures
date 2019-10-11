@@ -16,7 +16,8 @@ module.exports.blsInit = function (callback) {
 
 class Member {
   constructor (threshold, numMembers) {
-    // assert(threshold) < n, > 1 etc
+    assert(numMembers > 1, 'Need at least two members')
+    assert(threshold <= numMembers, 'Threshold must not be greater than number of members')
     this.recievedShares = []
     this.vvecs = []
     this.members = {}

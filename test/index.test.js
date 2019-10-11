@@ -63,9 +63,8 @@ describe('basic', (context) => {
           }
         })
       })
-// console.log(JSON.stringify(members, null, 4))
-      const hashOfMessage = signatures[Object.keys(signatures)[0]].hashOfMessage
-      // assert.ok(members[Object.keys(members)[1]].groupSignatures[hashOfMessage], 'Group signature valid')
+      // const hashOfMessage = signatures[Object.keys(signatures)[0]].hashOfMessage
+      assert.ok(members[Object.keys(members)[1]].groupSignatures[message], 'Group signature valid')
       next()
     })
   })

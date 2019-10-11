@@ -10,6 +10,7 @@
   "license": "AGPL-3.0-only",
   "dependencies": {
     "bls-lib": "^0.3.4",
+    "bls-wasm": "^0.2.7",
     "dkg": "0.0.1"
   },
   "devDependencies": {

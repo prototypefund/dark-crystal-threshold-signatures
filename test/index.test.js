@@ -12,23 +12,25 @@ describe('basic', (context) => {
     ThresholdSig.blsInit(() => {
       memberIds.forEach((myId) => {
         var member = ThresholdSig(threshold, memberIds.length) // 3 of 5
-        member.initId(myId)
+        const mySk = member.initId(myId)
 
-        memberIds.forEach((id) => {
-          if (id !== myId) {
-            member.addMember(id)
+        members[mySk] = member
+      })
+      Object.keys(members).forEach((mySk) => {
+        Object.keys(members).forEach((sk) => {
+          if (sk !== mySk) {
+            members[mySk].addMember(sk)
           }
         })
-
-        contributions[myId] = member.generateContribution()
-        members[myId] = member
+        contributions[mySk] = members[mySk].generateContribution()
       })
+
       assert.true(Object.keys(contributions).length === memberIds.length, 'Correct number of contributions')
 
       // recieve contribution round
-      memberIds.forEach((myId) => {
+      Object.keys(members).forEach((myId) => {
         assert.true(contributions[myId].vvec.length === threshold, 'verification vector has length = treshold')
-        memberIds.forEach((id) => {
+        Object.keys(members).forEach((id) => {
           if (id !== myId) {
             // assert.ok(contributions[id].contrib[myId], `Contribution from peer ${memberIds.indexOf(id)} to peer ${memberIds.indexOf(myId)} exists`)
             members[myId].storeVerificationVector(id, contributions[id].vvec)
@@ -39,7 +41,7 @@ describe('basic', (context) => {
 
       // check that everything worked
       var groupKeys = []
-      memberIds.forEach((id) => {
+      Object.keys(members).forEach((id) => {
         if (members[id].groupPublicKeyExport) groupKeys.push(members[id].groupPublicKeyExport)
       })
       assert.true(groupKeys.length === memberIds.length, 'Every member has a group public key')
@@ -50,20 +52,20 @@ describe('basic', (context) => {
       const message = 'its nice to be important but its more important to be nice'
       const signatures = {}
       // 3 members sign
-      memberIds.slice(0, threshold).forEach((myId) => {
+      Object.keys(members).slice(0, threshold).forEach((myId) => {
         signatures[myId] = members[myId].sign(message)
         assert.ok(signatures[myId].signature, 'Signature OK')
       })
-      memberIds.slice(0, threshold).forEach((myId) => {
-        memberIds.slice(0, threshold).forEach((id) => {
+      Object.keys(members).slice(0, threshold).forEach((myId) => {
+        Object.keys(members).slice(0, threshold).forEach((id) => {
           if (id !== myId) {
             members[myId].recieveSignature(signatures[id].signature, id, signatures[id].hashOfMessage)
           }
         })
       })
-
-      const hashOfMessage = signatures[memberIds[0]].hashOfMessage
-      assert.ok(members[memberIds[1]].groupSignatures[hashOfMessage], 'Group signature valid')
+// console.log(JSON.stringify(members, null, 4))
+      const hashOfMessage = signatures[Object.keys(signatures)[0]].hashOfMessage
+      assert.ok(members[Object.keys(members)[1]].groupSignatures[hashOfMessage], 'Group signature valid')
       next()
     })
   })

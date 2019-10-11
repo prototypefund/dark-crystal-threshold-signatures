@@ -19,7 +19,6 @@ class Member {
   constructor (threshold, numMembers) {
     // assert(threshold) < n, > 1 etc
     this.recievedShares = []
-    this.isReady = false
     this.vvecs = []
     this.members = {}
     this.signatures = {}
@@ -36,24 +35,27 @@ class Member {
     this.id = seed
     this.sk = bls.secretKey()
     bls.hashToSecretKey(this.sk, Buffer.from([seed]))
-    this.members[bls.secretKeyExport(this.sk)] = {}
+    this.skHex = int8ToHex(bls.secretKeyExport(this.sk))
+    this.members[this.skHex] = {}
+    return this.skHex
   }
 
   addMember (secretKey) {
     this.members[secretKey] = this.members[secretKey] || {}
+    // this.members[secretKey].sk = secretKey
   }
 
   generateContribution () {
     assert(Object.keys(this.members).length === this.numMembers, `not enough member ids, ${this.numMembers} needed`)
-    const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members).map(k => bls.secretKeyImport(k)), this.threshold)
-    this.vvec = verificationVector.map(v => bls.publicKeyExport(v)) // publish this publicly
-    this.members[bls.secretKeyExport(this.sk)].vvec = this.vvec
+    const { verificationVector, secretKeyContribution } = dkg.generateContribution(bls, Object.keys(this.members).map(k => bls.secretKeyImport(hexToInt8(k))), this.threshold)
+    this.vvec = verificationVector.map(v => int8ToHex(bls.publicKeyExport(v))) // publish this publicly
+    this.members[this.skHex].vvec = this.vvec
     console.log('----')
     secretKeyContribution.forEach((contrib, i) => {
-      const contribBuffer = bls.secretKeyExport(contrib)
+      const contribBuffer = int8ToHex(bls.secretKeyExport(contrib))
       this.contribBuffers[Object.keys(this.members)[i]] = contribBuffer
     })
-    this.recievedShares.push(this.contribBuffers[bls.secretKeyExport(this.sk)])
+    this.recievedShares.push(this.contribBuffers[this.skHex])
     return {
       vvec: this.vvec,
       contrib: this.contribBuffers
@@ -67,16 +69,16 @@ class Member {
       if (this.members[someMember].vvec) vvecs.push(this.members[someMember].vvec)
     })
     if (vvecs.length === Object.keys(this.members).length) {
-      const vvecsPointers = vvecs.map(vvec => vvec.map(v => bls.publicKeyImport(v)))
+      const vvecsPointers = vvecs.map(vvec => vvec.map(v => bls.publicKeyImport(hexToInt8(v))))
       this.groupVvec = dkg.addVerificationVectors(bls, vvecsPointers)
       this.groupPublicKey = this.groupVvec[0]
-      this.groupPublicKeyExport = bls.publicKeyExport(this.groupPublicKey)
+      this.groupPublicKeyExport = int8ToHex(bls.publicKeyExport(this.groupPublicKey))
     }
   }
 
   recieveContribution (sk, keyContributionBuffer) {
-    const keyContribution = bls.secretKeyImport(keyContributionBuffer)
-    const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.publicKeyImport(v)))
+    const keyContribution = bls.secretKeyImport(hexToInt8(keyContributionBuffer))
+    const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.publicKeyImport(hexToInt8(v))))
     if (!verified) return false
     this.recievedShares.push(keyContribution)
     // if ((this.recievedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
@@ -91,29 +93,37 @@ class Member {
     assert(this.groupSecretKeyShare, 'Group secret key share not yet complete')
     const signaturePointer = bls.signature()
     bls.sign(signaturePointer, this.groupSecretKeyShare, message)
+    const pk = bls.publicKey()
+    bls.getPublicKey(pk, this.groupSecretKeyShare)
+    console.log('sigtest:', bls.verify(signaturePointer, pk, message))
     const hashOfMessage = sha256(message)
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
-    const signature = bls.signatureExport(signaturePointer)
-    const signatureObject = { signature, id: this.sk }
+    const signature = int8ToHex(bls.signatureExport(signaturePointer))
+    const signatureObject = { signature, id: this.skHex }
     this.signatures[hashOfMessage].push(signatureObject)
     this.messagesByHash[hashOfMessage] = message
     return { signature, hashOfMessage }
   }
 
-  recieveSignature (signature, id, hashOfMessage) {
+  recieveSignature (signature, sk, hashOfMessage) {
     this.signatures[hashOfMessage] = this.signatures[hashOfMessage] || []
-    const signatureObject = { signature, id: this.idToSk[id] }
-    // check we dont already have it
-    if (this.signatures[hashOfMessage].indexOf(signatureObject) < 0) this.signatures[hashOfMessage].push(signatureObject)
+    const signatureObject = { signature, id: sk }
+    // check we dont already have it (need to compare objects)
+    // if (this.signatures[hashOfMessage].indexOf(signatureObject) < 0)
+    this.signatures[hashOfMessage].push(signatureObject)
 
     if ((this.signatures[hashOfMessage].length >= this.threshold) && (!this.groupSignatures[hashOfMessage])) {
       const groupSig = bls.signature()
 
       // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
 
-      const signatures = Object.values(this.signatures[hashOfMessage]).map(s => bls.signatureImport(bufferToInt8(s.signature))).slice(0, this.threshold)
+      var signatures = []
+      var signerIds = []
+      this.signatures[hashOfMessage].forEach((sigObject) => {
+        signatures.push(bls.signatureImport(hexToInt8(sigObject.signature)))
+        signerIds.push(bls.secretKeyImport(hexToInt8(sigObject.id)))
+      })
 
-      const signerIds = Object.values(this.signatures[hashOfMessage]).map(s => s.id).slice(0, this.threshold)
       console.log(signatures)
       console.log(signerIds)
       bls.signatureRecover(groupSig, signatures, signerIds)
@@ -158,13 +168,22 @@ function sha256 (message) {
   return hash.digest('hex')
 }
 
-function bufferToInt8 (buf) {
-  // TODO
-  // return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
-  return buf
+function int8ToHex (ta) {
+  return Buffer.from(ta).toString('hex')
 }
 
-function int8ToBuffer (intArray) {
-  // TODO
-  return intArray
+function hexToInt8 (h) {
+  return bufferToInt8Array(Buffer.from(h, 'hex'))
+}
+
+function bufferToInt8Array (a) {
+  const ta = new Int8Array(a.length)
+  for (var i = 0; i < a.length; i++) {
+    ta[i] = conv(a[i])
+  }
+  return ta
+
+  function conv (i) {
+    return (i > 127) ? i - 256 : i
+  }
 }

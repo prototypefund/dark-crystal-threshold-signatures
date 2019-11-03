@@ -23,7 +23,7 @@ class Member {
     this.members = {}
     this.signatures = {}
     // this.messagesByHash = {}
-    this.contribBuffers = {}
+    this.contribs = {}
     this.threshold = threshold
     this.numMembers = numMembers
     this.groupSignatures = {}
@@ -52,14 +52,14 @@ class Member {
     // verificationVector.forEach(v => bls.free(v))
     this.members[this.skHex].vvec = this.vvec
     secretKeyContribution.forEach((contrib, i) => {
-      const contribBuffer = contrib.serializeToHexStr()
-      this.contribBuffers[Object.keys(this.members)[i]] = contribBuffer
+      const contribHex = contrib.serializeToHexStr()
+      this.contribs[Object.keys(this.members)[i]] = contribHex
       contrib.clear()
     })
-    this.recievedShares.push(bls.deserializeHexStrToSecretKey(this.contribBuffers[this.skHex]))
+    this.recievedShares.push(bls.deserializeHexStrToSecretKey(this.contribs[this.skHex]))
     return {
       vvec: this.vvec,
-      contrib: this.contribBuffers
+      contrib: this.contribs
     }
   }
 

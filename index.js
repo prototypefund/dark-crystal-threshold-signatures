@@ -34,7 +34,8 @@ class Member {
     assert(!this.sk, 'id already generated')
     this.id = seed
     this.sk = new bls.SecretKey()
-    this.sk.setHashOf(Buffer.from([seed]))
+    if (typeof seed === 'number') seed = Buffer.from([seed])
+    this.sk.setHashOf(seed)
     this.skHex = this.sk.serializeToHexStr()
     this.members[this.skHex] = {}
     return this.skHex
@@ -71,7 +72,6 @@ class Member {
     })
     if (vvecs.length === Object.keys(this.members).length) {
       const vvecsPointers = vvecs.map(vvec => vvec.map(v => bls.deserializeHexStrToPublicKey(v)))
-      // console.log(vvecsPointers)
       this.groupVvec = dkg.addVerificationVectors(vvecsPointers)
       this.groupPublicKey = this.groupVvec[0]
       this.groupPublicKeyExport = this.groupPublicKey.serializeToHexStr()
@@ -96,7 +96,6 @@ class Member {
     const signaturePointer = this.groupSecretKeyShare.sign(message)
     // const pk = bls.publicKey()
     // bls.getPublicKey(pk, this.groupSecretKeyShare)
-    // console.log('sigtest:', bls.verify(signaturePointer, pk, message))
     this.signatures[message] = this.signatures[message] || []
     const signature = signaturePointer.serializeToHexStr()
     const signatureObject = { signature, id: this.skHex }
@@ -114,8 +113,6 @@ class Member {
     if ((this.signatures[message].length >= this.threshold) && (!this.groupSignatures[message])) {
       const groupSig = new bls.Signature()
 
-      // console.log('signatures', Object.values(this.signatures[hashOfMessage]).map(s => Buffer.from(s.signature).toString('hex')+' '+s.id))
-
       var signatures = []
       var signerIds = []
       this.signatures[message].forEach((sigObject) => {
@@ -123,11 +120,8 @@ class Member {
         signerIds.push(bls.deserializeHexStrToSecretKey(sigObject.id))
       })
 
-      // console.log(signatures)
-      // console.log(signerIds)
       groupSig.recover(signatures, signerIds)
 
-      // console.log(this.groupPublicKey.verify(groupSig, message))
       this.groupSignatures[message] = this.groupPublicKey.verify(groupSig, message)
         ? groupSig
         : false

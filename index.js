@@ -79,6 +79,7 @@ class Member {
   }
 
   recieveContribution (sk, keyContributionStr) {
+    // TODO: check we dont already have it from that sk. (cant assume bls wont give us a new pointer for the same contrib)
     const keyContribution = bls.deserializeHexStrToSecretKey(keyContributionStr)
     const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.deserializeHexStrToPublicKey(v)))
     if (!verified) return false
@@ -92,6 +93,7 @@ class Member {
 
   sign (message) {
     // TODO: assert message...
+    // TODO: return hash of message
     assert(this.groupSecretKeyShare, 'Group secret key share not yet complete')
     const signaturePointer = this.groupSecretKeyShare.sign(message)
     // const pk = bls.publicKey()
@@ -108,13 +110,15 @@ class Member {
     const signatureObject = { signature, id: sk }
     // check we dont already have it (need to compare objects)
     // if (this.signatures[hashOfMessage].indexOf(signatureObject) < 0)
-    this.signatures[message].push(signatureObject)
+    if (!this.signatures[message].find(o => o.id === sk)) this.signatures[message].push(signatureObject)
 
     if ((this.signatures[message].length >= this.threshold) && (!this.groupSignatures[message])) {
       const groupSig = new bls.Signature()
 
       var signatures = []
       var signerIds = []
+      console.log(Object.keys(this.members))
+      console.log(this.signatures)
       this.signatures[message].forEach((sigObject) => {
         signatures.push(bls.deserializeHexStrToSignature(sigObject.signature))
         signerIds.push(bls.deserializeHexStrToSecretKey(sigObject.id))
@@ -129,8 +133,8 @@ class Member {
   }
 
   saveState () {
-    //this.signatures
-    //Buffer.from(bls.signatureExport())
+    // this.signatures
+    // Buffer.from(bls.signatureExport())
   }
 
   loadState () {

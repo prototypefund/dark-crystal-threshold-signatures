@@ -33,7 +33,7 @@ Generate a verification vector and share contributions for each other member.
 - `vvec` is an array of hex encoded strings.  This should be published publicly.
 - `contrib` is an object, mapping hex encoded member ids to share contributions.  Each share contribution should be send privately to the respective member.
 
-### `member.storeVerificationVector(id, vvec) 
+### `member.storeVerificationVector(id, vvec)` 
 
 Store the verification vector of another member of the given id. 
 

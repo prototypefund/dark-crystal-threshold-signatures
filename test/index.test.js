@@ -27,14 +27,14 @@ describe('basic', (context) => {
 
       assert.true(Object.keys(contributions).length === memberIds.length, 'Correct number of contributions')
 
-      // recieve contribution round
+      // receive contribution round
       Object.keys(members).forEach((myId) => {
         assert.true(contributions[myId].vvec.length === threshold, 'verification vector has length = treshold')
         Object.keys(members).forEach((id) => {
           if (id !== myId) {
             // assert.ok(contributions[id].contrib[myId], `Contribution from peer ${memberIds.indexOf(id)} to peer ${memberIds.indexOf(myId)} exists`)
             members[myId].storeVerificationVector(id, contributions[id].vvec)
-            assert.true(members[myId].recieveContribution(id, contributions[id].contrib[myId]), 'contribution valid')
+            assert.true(members[myId].receiveContribution(id, contributions[id].contrib[myId]), 'contribution valid')
           }
         })
       })
@@ -59,7 +59,7 @@ describe('basic', (context) => {
       Object.keys(members).slice(0, threshold).forEach((myId) => {
         Object.keys(members).slice(0, threshold).forEach((id) => {
           if (id !== myId) {
-            members[myId].recieveSignature(signatures[id].signature, id, message)
+            members[myId].receiveSignature(signatures[id].signature, id, message)
           }
         })
       })

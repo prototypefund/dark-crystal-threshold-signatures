@@ -18,7 +18,7 @@ class Member {
   constructor (threshold, numMembers) {
     assert(numMembers > 1, 'Need at least two members')
     assert(threshold <= numMembers, 'Threshold must not be greater than number of members')
-    this.recievedShares = []
+    this.receivedShares = []
     this.vvecs = []
     this.members = {}
     this.signatures = {}
@@ -57,7 +57,7 @@ class Member {
       this.contribs[Object.keys(this.members)[i]] = contribHex
       contrib.clear()
     })
-    this.recievedShares.push(bls.deserializeHexStrToSecretKey(this.contribs[this.skHex]))
+    this.receivedShares.push(bls.deserializeHexStrToSecretKey(this.contribs[this.skHex]))
     return {
       vvec: this.vvec,
       contrib: this.contribs
@@ -78,15 +78,15 @@ class Member {
     }
   }
 
-  recieveContribution (sk, keyContributionStr) {
+  receiveContribution (sk, keyContributionStr) {
     // TODO: check we dont already have it from that sk. (cant assume bls wont give us a new pointer for the same contrib)
     const keyContribution = bls.deserializeHexStrToSecretKey(keyContributionStr)
     const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.deserializeHexStrToPublicKey(v)))
     if (!verified) return false
-    this.recievedShares.push(keyContribution)
-    // if ((this.recievedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
-    if ((this.recievedShares.length === Object.keys(this.members).length) && !this.groupSecretKeyShare) {
-      this.groupSecretKeyShare = dkg.addContributionShares(this.recievedShares)
+    this.receivedShares.push(keyContribution)
+    // if ((this.receivedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
+    if ((this.receivedShares.length === Object.keys(this.members).length) && !this.groupSecretKeyShare) {
+      this.groupSecretKeyShare = dkg.addContributionShares(this.receivedShares)
     }
     return true
   }
@@ -105,7 +105,7 @@ class Member {
     return { signature, message }
   }
 
-  recieveSignature (signature, sk, message) {
+  receiveSignature (signature, sk, message) {
     this.signatures[message] = this.signatures[message] || []
     const signatureObject = { signature, id: sk }
     // check we dont already have it (need to compare objects)
@@ -117,8 +117,7 @@ class Member {
 
       var signatures = []
       var signerIds = []
-      console.log(Object.keys(this.members))
-      console.log(this.signatures)
+
       this.signatures[message].forEach((sigObject) => {
         signatures.push(bls.deserializeHexStrToSignature(sigObject.signature))
         signerIds.push(bls.deserializeHexStrToSecretKey(sigObject.id))

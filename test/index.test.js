@@ -13,7 +13,9 @@ describe('basic', (context) => {
       memberIds.forEach((myId) => {
         var member = ThresholdSig(threshold, memberIds.length) // 3 of 5
         const mySk = member.initId(myId)
-
+        assert.equal(member.skHex.length, 64, 'skHex has correct length')
+        assert.equal(typeof member.skHex, 'string', 'skHex is a string')
+        assert.equal(member.skHex, mySk, 'skHex returned')
         members[mySk] = member
       })
       Object.keys(members).forEach((mySk) => {

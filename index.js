@@ -19,6 +19,7 @@ class Member {
     assert(numMembers > 1, 'Need at least two members')
     assert(threshold <= numMembers, 'Threshold must not be greater than number of members')
     this.receivedShares = []
+    this.receivedSharesFrom = []
     this.vvecs = []
     this.members = {}
     this.signatures = {}
@@ -79,14 +80,25 @@ class Member {
   }
 
   receiveContribution (sk, keyContributionStr) {
-    // TODO: check we dont already have it from that sk. (cant assume bls wont give us a new pointer for the same contrib)
+    assert(typeof keyContributionStr === 'string', 'key contribution should be a hex encoded string')
+
+    // check we dont already have it from that sk. (cant assume bls wont give us a new pointer for the same contrib)
+    if (this.receivedSharesFrom.includes(sk)) return true
+
     const keyContribution = bls.deserializeHexStrToSecretKey(keyContributionStr)
-    const verified = dkg.verifyContributionShare(bls, this.sk, keyContribution, this.members[sk].vvec.map(v => bls.deserializeHexStrToPublicKey(v)))
+    const verified = dkg.verifyContributionShare(
+      bls,
+      this.sk,
+      keyContribution,
+      this.members[sk].vvec.map(v => bls.deserializeHexStrToPublicKey(v))
+    )
     if (!verified) return false
     this.receivedShares.push(keyContribution)
+    this.receivedSharesFrom.push(sk)
     // if ((this.receivedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
     if ((this.receivedShares.length === Object.keys(this.members).length) && !this.groupSecretKeyShare) {
       this.groupSecretKeyShare = dkg.addContributionShares(this.receivedShares)
+      console.log(this.groupSecretKeyShare)
     }
     return true
   }
@@ -106,6 +118,10 @@ class Member {
   }
 
   receiveSignature (signature, sk, message) {
+    assert(typeof signature === 'string', 'signature must be a string')
+    assert(typeof sk === 'string', 'id must be a string')
+    assert(message, 'Message not given')
+
     this.signatures[message] = this.signatures[message] || []
     const signatureObject = { signature, id: sk }
     // check we dont already have it (need to compare objects)
@@ -124,7 +140,6 @@ class Member {
       })
 
       groupSig.recover(signatures, signerIds)
-
       this.groupSignatures[message] = this.groupPublicKey.verify(groupSig, message)
         ? groupSig
         : false

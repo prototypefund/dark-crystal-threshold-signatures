@@ -10,7 +10,7 @@
   "license": "AGPL-3.0-only",
   "dependencies": {
     "bls-wasm": "^0.2.7",
-    "dkg": "0.0.1"
+    "dkg": "^0.0.2"
   },
   "devDependencies": {
     "tap-spec": "^5.0.0",

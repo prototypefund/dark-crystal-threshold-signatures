@@ -98,7 +98,6 @@ class Member {
     // if ((this.receivedShares.length === this.threshold) && !this.groupSecretKeyShare) { // this.members.length
     if ((this.receivedShares.length === Object.keys(this.members).length) && !this.groupSecretKeyShare) {
       this.groupSecretKeyShare = dkg.addContributionShares(this.receivedShares)
-      console.log(this.groupSecretKeyShare)
     }
     return true
   }

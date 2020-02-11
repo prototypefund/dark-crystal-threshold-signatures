@@ -1,10 +1,8 @@
-# threshold-signatures
+# Threshold-signatures
 
-**Work in progress**
+This is a class providing group threshold signatures using distributed key generation.  It is designed to be used for dark-crystal's key re-issuance mechanism, but could also be used for other use-cases where a message must be signed on behalf of a group.
 
-This is class providing group threshold signatures using distributed key generation.
-
-Uses [bls-wasm](https://github.com/herumi/bls-wasm) and [a fork of dfinity/dkg](https://gitlab.com/dark-crystal/dkg) (not yet published to npm)
+It uses [bls-wasm](https://github.com/herumi/bls-wasm) and [dfinity/dkg](https://github.com/dfinity-side-projects/dkg)
 
 ## API
 
